@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Payment Export Reconciliation — Free Offline CSV Demo</title>
+<style>
+body{margin:0;background:#f1f6f9;color:#19394a;font:16px/1.5 system-ui,sans-serif}
+header{padding:35px 4%;background:#10334a;color:#fff}
+header p{max-width:760px;color:#d3e8e9}main{max-width:1040px;margin:28px auto;padding:0 18px 40px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:730px){.grid{grid-template-columns:1fr}}
+.panel{background:white;padding:20px;border:1px solid #d9e5eb;border-radius:14px}
+h1{line-height:1.13}h2{font-size:20px;margin:0 0 10px}textarea{width:100%;height:270px;box-sizing:border-box;padding:12px;font:12px/1.5 monospace;border:1px solid #a5c2d1;border-radius:8px;resize:vertical}
+button{background:#087d80;color:white;border:0;border-radius:7px;padding:10px 13px;cursor:pointer;margin:9px 5px 0 0}
+button.alt{background:white;border:1px solid #087d80;color:#087d80}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:7px 5px;border-bottom:1px solid #e0e7ef;text-align:left;white-space:nowrap}
+.scroll{overflow:auto}small{color:#526978}.callout{padding:16px;background:#e6f3f7;border-radius:10px;margin-bottom:19px}
+a{color:#087c80}
+</style>
+</head>
+<body>
+<header><h1>Review a payment-export ledger locally</h1><p>Try synthetic payment CSV rows: pending transactions, duplicate IDs, conflicts, precision errors and net balances by network and asset.</p></header>
+<main>
+<div class="callout"><b>Independent illustrative demo.</b> Works offline. No data upload, wallet access, on-chain verification or tracking scripts. This is not a copy of the paid Python tool, and does not parse raw x402 response formats. Use only synthetic data. This limited standalone example accepts unquoted CSV fields.</div>
+<div class="grid">
+<section class="panel"><h2>CSV example</h2><p><small>Required columns: payment_id,network,asset,status,direction,amount. Status: settled or pending; direction: incoming or outgoing.</small></p><textarea id="input" spellcheck="false"></textarea><button id="run">Analyze CSV</button><button class="alt" id="reset">Reset sample</button><button class="alt" id="json">Save JSON</button></section>
+<section class="panel"><h2>Report</h2><p id="status">Ready</p><p><b>Settled:</b> <span id="settled">—</span> · <b>Pending:</b> <span id="pending">—</span> · <b>Invalid/conflicted:</b> <span id="invalid">—</span></p>
+<h2>Settled net by network and asset</h2><div class="scroll"><table><thead><tr><th>Network</th><th>Asset</th><th>Incoming</th><th>Outgoing</th><th>Net</th></tr></thead><tbody id="totals"></tbody></table></div>
+<h2 style="margin-top:20px">Exceptions</h2><div class="scroll"><table><thead><tr><th>Payment ID</th><th>Type</th><th>Reason</th></tr></thead><tbody id="exceptions"></tbody></table></div></section>
+</div>
+<div class="panel" style="margin-top:16px"><h2>Full offline Python toolkit (optional)</h2><p>For production-style local CSV, JSON and JSONL reconciliation workflows, the separate <a href="https://speedbot.dev/products/product_b469bc0491a04855bce0e75da7904113">Revenue Ledger QA Kit on Speedbot Marketplace</a> is listed for 1.99 USDC, subject to its live terms. The advertised kit includes a Python CLI, Decimal handling, validation, sample inputs, 17 regression tests, and a commercial-use license. It does not independently verify chain settlement or fix x402 protocol issues.</p><p><small>Seller disclosure: this educational demonstration is promoted by the owner/seller of that toolkit. It provides no promise of sales or financial return. The free example itself requires no purchase.</small></p></div>
+</main>
+<script>
+"use strict";
+const sample="payment_id,network,asset,status,direction,amount\npay-101,Base,USDC,settled,incoming,12.50\npay-102,Base,USDC,settled,outgoing,2.25\npay-103,Base,USDC,pending,incoming,8.00\npay-104,Base,USDC,settled,incoming,0.75\npay-104,Base,USDC,settled,incoming,0.75\npay-105,Base,USDC,settled,incoming,3.00\npay-105,Base,USDC,settled,incoming,4.00\npay-106,Arbitrum,USDC,settled,outgoing,1.00\npay-107,Base,USDT,settled,incoming,1.1234567\npay-108,Base,USDC,settled,incoming,8.00";
+const byId=id=>document.getElementById(id);
+const escapeHTML=v=>String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt=v=>{let neg=v<0n;if(neg)v=-v;let dec=(v%1000000n).toString().padStart(6,"0").replace(/0+$/,"").padEnd(2,"0");return(neg?"-":"")+(v/1000000n).toString()+"."+dec};
+const scaled=s=>{if(!/^(0|[1-9]\d*)(?:\.\d{1,6})?$/.test(s))throw Error("Invalid decimal (up to six places)");let p=s.split(".");let x=BigInt(p[0])*1000000n+BigInt(((p[1]||"")+"000000").slice(0,6));if(x>999999999999999999n)throw Error("Amount too large");return x};
+let report=null;
+function analyze(source){
+ const lines=source.trim().split(/\r?\n/).filter(Boolean);if(lines.length<2)throw Error("CSV needs header and data");
+ const hdr=lines.shift().split(",").map(x=>x.trim().toLowerCase());const needed=["payment_id","network","asset","status","direction","amount"];
+ for(const f of needed)if(!hdr.includes(f))throw Error("Missing column "+f);
+ let rows=lines.map((line,i)=>{const values=line.split(",").map(x=>x.trim());if(values.length!==hdr.length)throw Error("Row "+(i+2)+" has wrong field count");return Object.fromEntries(hdr.map((h,j)=>[h,values[j]]))});
+ let ids=new Map(),totals=new Map(),flags=[],settled=0,pending=0,invalid=0;
+ for(const r of rows){const id=r.payment_id||"(empty)";if(!ids.has(id))ids.set(id,[]);ids.get(id).push(r)}
+ for(const [id,group] of ids){
+  let signatures=new Set(group.map(r=>JSON.stringify(needed.map(k=>r[k]))));
+  if(signatures.size>1){invalid++;flags.push({id,type:"Conflict",reason:"Same ID, inconsistent fields; excluded"});continue}
+  if(group.length>1)flags.push({id,type:"Duplicate",reason:"Repeated identical record counted once"});
+  const r=group[0];
+  try{
+   if(!r.payment_id||!r.network||!r.asset)throw Error("Missing ID, network or asset");
+   if(!["settled","pending"].includes(r.status))throw Error("Invalid status");
+   if(!["incoming","outgoing"].includes(r.direction))throw Error("Invalid direction");
+   const n=scaled(r.amount);
+   if(r.status==="pending"){pending++;flags.push({id,type:"Pending",reason:"Excluded from settled totals"});continue}
+   settled++;const key=r.network+"\t"+r.asset;if(!totals.has(key))totals.set(key,{network:r.network,asset:r.asset,incoming:0n,outgoing:0n});totals.get(key)[r.direction]+=n;
+  }catch(e){invalid++;flags.push({id,type:"Invalid",reason:e.message})}
+ }
+ return {rows:rows.length,settled,pending,invalid,totals:[...totals.values()].map(t=>({network:t.network,asset:t.asset,incoming:fmt(t.incoming),outgoing:fmt(t.outgoing),net:fmt(t.incoming-t.outgoing)})),flags};
+}
+function draw(){
+ try{
+ report=analyze(byId("input").value);for(const k of ["settled","pending","invalid"])byId(k).textContent=report[k];
+ byId("status").textContent="Analyzed "+report.rows+" rows, locally in your browser.";
+ byId("totals").innerHTML=report.totals.map(t=>"<tr>"+[t.network,t.asset,t.incoming,t.outgoing,t.net].map(x=>"<td>"+escapeHTML(x)+"</td>").join("")+"</tr>").join("")||'<tr><td colspan="5">No settled records</td></tr>';
+ byId("exceptions").innerHTML=report.flags.map(f=>"<tr>"+[f.id,f.type,f.reason].map(x=>"<td>"+escapeHTML(x)+"</td>").join("")+"</tr>").join("")||'<tr><td colspan="3">None</td></tr>';
+ }catch(e){report=null;byId("status").textContent="Input error: "+e.message;byId("totals").textContent="";byId("exceptions").textContent="";for(const k of ["settled","pending","invalid"])byId(k).textContent="—"}
+}
+byId("run").addEventListener("click",draw);
+byId("reset").addEventListener("click",()=>{byId("input").value=sample;draw()});
+byId("json").addEventListener("click",()=>{if(!report)draw();if(!report)return;const data=new Blob([JSON.stringify({disclaimer:"Illustrative CSV only; no on-chain verification",...report},null,2)],{type:"application/json"});let u=URL.createObjectURL(data),a=document.createElement("a");a.href=u;a.download="reconciliation-demo.json";a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)});
+byId("input").value=sample;draw();
+</script>
+</body>
+</html>
