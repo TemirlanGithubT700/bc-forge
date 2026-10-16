@@ -52,6 +52,8 @@ For this fixture, **Base / USDC settled net = 19.00 units**, because 12.50 - 2.2
 
 ## Free interactive example
 
+**Long-lived downloadable version:** [payment-export-reconciliation-demo.html](payment-export-reconciliation-demo.html) — use GitHub's **Download raw file** action, then open the saved HTML locally in your browser. This does not depend on PageShare hosting and requires no installation. It is a separate, limited educational demonstration, not the sold Python CLI.
+
 I have also published a **free synthetic CSV demo** of these general QA ideas:
 
 **[Try the browser-based reconciliation example](https://bright-tide-5545.hosted.pageshare.ai)**
