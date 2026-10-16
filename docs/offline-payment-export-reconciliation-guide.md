@@ -56,7 +56,7 @@ For this fixture, **Base / USDC settled net = 19.00 units**, because 12.50 - 2.2
 
 I have also published a **free synthetic CSV demo** of these general QA ideas:
 
-**[Try the browser-based reconciliation example](https://bright-tide-5545.hosted.pageshare.ai)**
+**[Try the browser-based reconciliation example](https://bright-tide-5545.hosted.pageshare.ai/?ps_t=trk_3a593b2d90cb489899567e94ed57f315)**
 
 It processes entered records locally and exports a JSON report. The current free public hosting expires **22 October 2026**, so that hosted URL may stop working after that date. The page is illustrative, not a reproduction of the paid tool.
 
