@@ -495,3 +495,11 @@ How security reports are rewarded, and whether a hosted bounty program is live, 
 - [Stellar SDK (JS)](https://github.com/stellar/js-stellar-sdk)
 - [SEP-41 Token Standard](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0041.md)
 - [drips.network](https://www.drips.network)
+
+---
+
+## Supplementary resource: offline payment export reconciliation
+
+When reviewing exports derived from batch payouts or payment event indexers, duplicated IDs, pending rows and conflicting records can distort apparent balances. See the [free payment-export QA guide](docs/offline-payment-export-reconciliation-guide.md) for a synthetic CSV fixture, decimal-safe ledger reasoning and a [standalone browser demo](docs/payment-export-reconciliation-demo.html) that can be downloaded and opened locally.
+
+**Disclosure:** This is a separate educational resource contributed by the owner of the commercial [Revenue Ledger QA Kit](https://speedbot.dev/products/product_b469bc0491a04855bce0e75da7904113), not a `bc-forge` integration or smart-contract capability. It does not check chain settlement, prove transaction authenticity, or modify Soroban contracts. The free guide and demo do not require buying anything.
